@@ -1,8 +1,21 @@
 {
     "cSpell.words": [
+        "bapi",
+        "bili",
         "bilibili",
         "chrono",
         "datetime",
+        "encrypter",
+        "josekit",
+        "OAEP",
+        "pkcs",
+        "qrcode",
         "reqwest"
-    ]
+    ],
+    "rust-analyzer.check.extraEnv": {
+        "VCPKG_ROOT": "C:\\src\\vcpkg"
+    },
+    "rust-analyzer.cargo.extraEnv": {
+        "VCPKG_ROOT": "C:\\src\\vcpkg"
+    }
 }

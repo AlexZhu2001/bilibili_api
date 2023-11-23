@@ -4,7 +4,7 @@ use crate::{
 };
 use chrono::{Days, FixedOffset, NaiveDateTime, NaiveTime, Utc};
 use md5::{Digest, Md5};
-use reqwest::RequestBuilder;
+use reqwest::{Client, RequestBuilder};
 use serde::{Deserialize, Serialize};
 
 #[cfg(not(test))]
@@ -12,7 +12,7 @@ fn get_timestamp() -> BResult<u64> {
     use std::time::{SystemTime, UNIX_EPOCH};
     let ts = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map_err(|e| BError::InternalError(format!("{e}")))?;
+        .map_err(|e| BError::from_internal_err(&e))?;
     return Ok(ts.as_secs());
 }
 
@@ -34,9 +34,9 @@ struct PartialNav {
 }
 
 /// Convert url into key
-/// 
+///
 /// url form like `https://i0.hdslb.com/bfs/wbi/<key>.png`
-/// 
+///
 /// so split '/' and get last one and split '.' then return first one
 fn url_to_key(url: &str) -> Option<&str> {
     let tmp = url.split('/').last()?;
@@ -47,7 +47,7 @@ fn url_to_key(url: &str) -> Option<&str> {
 /// Get timestamp of next day 00:00 (UTC +8)
 ///
 /// Get now time in East +8 and add one day, set time to 00:00
-/// 
+///
 /// Then get a timestamp
 fn get_next_day() -> BResult<u64> {
     const HOUR: i32 = 3600;
@@ -109,7 +109,7 @@ fn get_next_day() -> BResult<u64> {
 /// And other steps were implemented in `sign_data` function
 ///
 /// You can cache this object and reuse it in the same day TZ(UTC+8)
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct WbiSign {
     mixin_key: String,
     expire_time: u64,
@@ -117,19 +117,7 @@ pub struct WbiSign {
 
 impl WbiSign {
     /// Get wbi sign from bilibili server
-    ///
-    /// Example:
-    /// ```
-    /// use bilibili_api::sign::WbiSign;
-    ///
-    /// #[tokio::main]
-    /// async fn main(){
-    ///     let s = WbiSign::from_server().await.unwrap();
-    ///     println!("{:#?}", s);
-    /// }
-    /// ```
-    pub async fn from_server() -> BResult<WbiSign> {
-        use super::SESSION;
+    pub async fn from_server(client: &Client) -> BResult<WbiSign> {
         const MIXIN_KEY_ENC_TAB: [usize; 64] = [
             46, 47, 18, 2, 53, 8, 23, 32, 15, 50, 10, 31, 58, 3, 45, 35, 27, 43, 5, 49, 33, 9, 42,
             19, 29, 28, 14, 39, 12, 38, 41, 13, 37, 48, 7, 16, 24, 55, 40, 61, 26, 17, 0, 1, 60,
@@ -137,7 +125,7 @@ impl WbiSign {
         ];
 
         const URL: &str = "https://api.bilibili.com/x/web-interface/nav";
-        let req: BCommonJson<PartialNav> = SESSION
+        let req: BCommonJson<PartialNav> = client
             .get(URL)
             .send()
             .await
@@ -145,8 +133,11 @@ impl WbiSign {
             .json()
             .await
             .map_err(|e| BError::from_json_err(&e))?;
-        let (img_url, sub_url) = (req.data.wbi_img.img_url, req.data.wbi_img.sub_url);
-        let (img_key, sub_key) = match (url_to_key(&img_url), url_to_key(&sub_url)) {
+        let data = req.data.ok_or(BError::from_json_err(
+            "Invalid json field, data cannot be empty",
+        ))?;
+        let (img_url, sub_url) = (&data.wbi_img.img_url, &data.wbi_img.sub_url);
+        let (img_key, sub_key) = match (url_to_key(img_url), url_to_key(sub_url)) {
             (Some(i), Some(s)) => (i, s),
             _ => return Err(BError::from_json_err("Invalid wbi key format.")),
         };
@@ -172,26 +163,6 @@ impl WbiSign {
     /// `data`: Query data
     ///
     /// If wbi key is expired will return error `BError::WbiTokenExpired`
-    ///
-    /// Example:
-    /// ```
-    /// use bilibili_api::sign::WbiSign;
-    /// use reqwest::Client;
-    /// const DATA: [(&str, &str); 3] = [("foo", "114"), ("bar", "514"), ("zab", "1919810")];
-    ///
-    /// #[tokio::main]
-    /// async fn main(){
-    ///     let s = WbiSign::from_server().await.unwrap();
-    ///     println!("{:#?}", s);
-    ///     let client = Client::new();
-    ///     let rq = client.get("http://useless.net");
-    ///     let rq = s.sign_data(rq, &DATA).unwrap();
-    ///     let r = rq.build().unwrap();
-    ///     for (k,v) in r.url().query_pairs(){
-    ///         println!("{}: {}", k, v);
-    ///     }
-    /// }
-    /// ```
     pub fn sign_data<T>(&self, req: RequestBuilder, data: &T) -> BResult<RequestBuilder>
     where
         T: Serialize + ?Sized,
@@ -203,9 +174,9 @@ impl WbiSign {
         }
         // Convert data into query pairs
         let query_str =
-            serde_urlencoded::to_string(data).map_err(|e| BError::InternalError(format!("{e}")))?;
-        let mut v: Vec<(&str, &str)> = serde_urlencoded::from_str(&query_str)
-            .map_err(|e| BError::InternalError(format!("{e}")))?;
+            serde_urlencoded::to_string(data).map_err(|e| BError::from_internal_err(&e))?;
+        let mut v: Vec<(&str, &str)> =
+            serde_urlencoded::from_str(&query_str).map_err(|e| BError::from_internal_err(&e))?;
         // Insert wts data
         let ts = now.to_string();
         v.push(("wts", &ts));
@@ -213,7 +184,7 @@ impl WbiSign {
         v.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
         // Url encode queries
         let mut query_str =
-            serde_urlencoded::to_string(&v).map_err(|e| BError::InternalError(format!("{e}")))?;
+            serde_urlencoded::to_string(&v).map_err(|e| BError::from_internal_err(&e))?;
         // Add mixin key as salt
         query_str.push_str(&self.mixin_key);
         // MD5 hash

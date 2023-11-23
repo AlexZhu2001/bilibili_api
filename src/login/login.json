@@ -1,0 +1,8 @@
+{
+    "get_qrcode": "https://passport.bilibili.com/x/passport-login/web/qrcode/generate",
+    "poll_qrcode": "https://passport.bilibili.com/x/passport-login/web/qrcode/poll",
+    "check_refresh": "https://passport.bilibili.com/x/passport-login/web/cookie/info",
+    "get_refresh_csrf_template": "https://www.bilibili.com/correspond/1/",
+    "refresh_cookie": "https://passport.bilibili.com/x/passport-login/web/cookie/refresh",
+    "confirm_refresh": "https://passport.bilibili.com/x/passport-login/web/confirm/refresh"
+}

@@ -1,42 +1,67 @@
-use std::fmt::Display;
+//! This module provides error types and parse function
 
 use serde::{Deserialize, Serialize};
+use std::fmt::Display;
 
-/// An alias of Result
+/// An alias of Result<T, BError>
 pub type BResult<T> = Result<T, BError>;
 
 /// Common error enum for this crate
 #[derive(Debug, Serialize, Deserialize)]
 pub enum BError {
+    /// Will be given when convert failed or system-level error
     InternalError(String),
+    /// Will be given when error occurred in http requests
     NetworkError(String),
+    /// Will be given when error occurred in parse json
     JsonParseError(String),
+    /// Wbi token was expired, this is not an error, refresh and continue
     WbiTokenExpired,
+    /// Server return an error code
+    BilibiliError(i64),
+    /// Will be given when error occurred in generate QR code
+    QrCodeGenError(String),
 }
 
 impl BError {
-    pub fn from_net_err<T: Display + ?Sized>(e: &T) -> Self {
+    pub(crate) fn from_net_err<T: Display + ?Sized>(e: &T) -> Self {
         BError::NetworkError(format!("Network error, {}", e))
     }
-    pub fn from_json_err<T: Display + ?Sized>(e: &T) -> Self {
+
+    pub(crate) fn from_json_err<T: Display + ?Sized>(e: &T) -> Self {
         BError::JsonParseError(format!("Json parse error, {}", e))
+    }
+
+    pub(crate) fn from_internal_err<T: Display + ?Sized>(e: &T) -> Self {
+        BError::InternalError(format!("Internal error, {}", e))
+    }
+
+    pub(crate) fn from_bilibili_err(e: i64) -> Self {
+        BError::BilibiliError(e)
+    }
+
+    pub(crate) fn from_qrcode_err<T: Display + ?Sized>(e: &T) -> Self {
+        BError::QrCodeGenError(format!("QrCode generate error, {}", e))
     }
 }
 
 /// Convert common error code into error message.
 ///
-/// `error_code`: Error code in reply json's code field
+/// `error_code`: Error code in `BError::BilibiliError`
 ///
-/// Example:
-/// ```
-/// use bilibili_api::error::try_parse_error_code;
+/// *Only common negative error code can be decoded by this function*
 ///
-/// fn main(){
-///     let msg = try_parse_error_code(0);
-///     println!("{}", msg);
-///     let msg = try_parse_error_code(-1);
-///     println!("{}", msg);
-/// }
+/// # Examples
+/// ```rust
+/// # use bilibili_api::error::try_parse_error_code;
+///
+/// # fn main(){
+/// let msg = try_parse_error_code(0);
+/// println!("{}", msg);
+///
+/// let msg = try_parse_error_code(-1);
+/// println!("{}", msg);
+/// # }
 /// ```
 pub fn try_parse_error_code(error_code: i64) -> &'static str {
     let err = match error_code {
