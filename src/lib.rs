@@ -5,12 +5,16 @@
 //! * `login`: Bilibili login api
 //!
 
+use async_trait::async_trait;
+use error::BResult;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use wbi_client::WbiClient;
+
 pub mod error;
 pub mod login;
 pub mod user;
 pub mod wbi_client;
-use std::collections::HashMap;
 
 pub(crate) type ApiMap = HashMap<&'static str, &'static str>;
 
@@ -40,6 +44,12 @@ where
     code: i64,
     message: String,
     data: Option<T>,
+}
+
+#[async_trait]
+trait ApiGet {
+    type Item;
+    async fn get(client: &WbiClient) -> BResult<Self::Item>;
 }
 
 #[cfg(test)]

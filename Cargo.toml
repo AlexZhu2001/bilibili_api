@@ -20,3 +20,7 @@ rsa = { version = "0.9.4", features = ["sha2"] }
 rand = "0.8.5"
 select = "0.6.0"
 qrcode = "0.12.0"
+async-trait = "0.1.74"
+
+[dev-dependencies]
+base64 = "0.21.5"

@@ -263,5 +263,31 @@ impl Credential {
     }
 }
 
+#[cfg(test)]
+mod test {
+    use base64::Engine;
+    use std::io::BufReader;
+
+    use super::Credential;
+    use crate::wbi_client::WbiClient;
+
+    #[tokio::test]
+    async fn test_decode_cred() {
+        let cred = std::env::var("CRED_TEST").unwrap();
+        let cred = base64::engine::general_purpose::STANDARD
+            .decode(&cred)
+            .unwrap();
+        let rdr = BufReader::new(&cred[..]);
+        let mut cred = Credential::load_json(rdr).unwrap();
+        let _client = WbiClient::builder()
+            .with_credential(&mut cred)
+            .await
+            .unwrap()
+            .build()
+            .await
+            .unwrap();
+    }
+}
+
 // Re-export
 pub use self::qrcode::{QRCodeLogin, QRCodeLoginState};

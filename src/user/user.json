@@ -1,0 +1,5 @@
+{
+    "my_info": "https://api.bilibili.com/x/member/web/account",
+    "vip_info": "https://api.bilibili.com/x/vip/web/user/info",
+    "nav_info": "https://api.bilibili.com/x/web-interface/nav"
+}
