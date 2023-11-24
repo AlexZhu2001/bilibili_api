@@ -1,6 +1,7 @@
 # bilibili_api
 
 ![GitHub License](https://img.shields.io/github/license/AlexZhu2001/bilibili_api)
+![Coverage](https://img.shields.io/codecov/c/github/AlexZhu2001/bilibili_api)
 
 本项目是基于[哔哩哔哩-API收集整理](https://github.com/SocialSisterYi/bilibili-API-collect)的Rust实现
 

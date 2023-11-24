@@ -195,3 +195,74 @@ pub(crate) async fn do_request<T: Serialize + DeserializeOwned>(
     let obj = resp.json().await.map_err(|e| BError::from_json_err(&e))?;
     Ok(obj)
 }
+
+#[cfg(test)]
+mod test {
+    use std::str::FromStr;
+
+    use super::*;
+    use base64::Engine;
+    use url::Url;
+
+    #[tokio::test]
+    async fn test_build_without_credential() {
+        let _client = WbiClient::builder().build().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_build_with_credential() {
+        let cred = std::env::var("CRED_TEST").unwrap();
+        let cred = base64::engine::general_purpose::STANDARD
+            .decode(&cred)
+            .unwrap();
+        let rdr = BufReader::new(&cred[..]);
+        let mut cred = Credential::load_json(rdr).unwrap();
+        let _client = WbiClient::builder()
+            .with_credential(&mut cred)
+            .await
+            .unwrap()
+            .build()
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_get() {
+        let cred = std::env::var("CRED_TEST").unwrap();
+        let cred = base64::engine::general_purpose::STANDARD
+            .decode(&cred)
+            .unwrap();
+        let rdr = BufReader::new(&cred[..]);
+        let mut cred = Credential::load_json(rdr).unwrap();
+        let client = WbiClient::builder()
+            .with_credential(&mut cred)
+            .await
+            .unwrap()
+            .build()
+            .await
+            .unwrap();
+        let _ = client.get("https://www.bilibili.com/");
+        let _ = client.get_with_data("https://www.bilibili.com/", &[("a", "b")]);
+        let _ = client.get_with_wbi("https://www.bilibili.com/", &[("a", "b")]);
+    }
+
+    #[tokio::test]
+    async fn test_get_cookies() {
+        let cred = std::env::var("CRED_TEST").unwrap();
+        let cred = base64::engine::general_purpose::STANDARD
+            .decode(&cred)
+            .unwrap();
+        let rdr = BufReader::new(&cred[..]);
+        let mut cred = Credential::load_json(rdr).unwrap();
+        let client = WbiClient::builder()
+            .with_credential(&mut cred)
+            .await
+            .unwrap()
+            .build()
+            .await
+            .unwrap();
+        let c = client.get_cookies().unwrap();
+        // dbg!(&c);
+        assert!(!c.is_empty());
+    }
+}

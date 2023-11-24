@@ -116,6 +116,13 @@ pub struct WbiSign {
 }
 
 impl WbiSign {
+    pub(crate) fn new(mixin_key: String, expire_time: u64) -> WbiSign {
+        Self {
+            mixin_key,
+            expire_time,
+        }
+    }
+
     /// Get wbi sign from bilibili server
     pub async fn from_server(client: &Client) -> BResult<WbiSign> {
         const MIXIN_KEY_ENC_TAB: [usize; 64] = [

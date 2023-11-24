@@ -186,6 +186,24 @@ fn get_bilibili_cookie(cookie_jar: Arc<CookieStoreRwLock>, name: &str) -> BResul
 }
 
 impl Credential {
+    /// Load credential in json with reader
+    ///
+    /// # Examples
+    /// ```rust
+    /// # use bilibili_api::login::*;
+    /// # use reqwest_cookie_store::{CookieStore, CookieStoreRwLock};
+    /// #
+    /// # fn main(){
+    /// # let data = r#"{"cookies": "test_c", "refresh_token": "test_t"}"#.as_bytes();
+    /// let reader = std::io::BufReader::new(data);
+    /// let c = Credential::load_json(reader).unwrap();
+    /// # }
+    /// ```
+    pub fn load_json<R: BufRead>(r: R) -> BResult<Self> {
+        let c = serde_json::from_reader(r).map_err(|e| BError::from_internal_err(&e))?;
+        Ok(c)
+    }
+
     /// Save credential in json with writer
     ///
     /// # Examples
@@ -204,28 +222,6 @@ impl Credential {
     pub fn save_json<W: Write>(&self, w: &mut W) -> BResult<()> {
         serde_json::to_writer(w, self).map_err(|e| BError::from_internal_err(&e))?;
         Ok(())
-    }
-
-    /// Load credential in json with reader
-    ///
-    /// # Examples
-    /// ```rust
-    /// # use bilibili_api::login::*;
-    /// # use reqwest_cookie_store::{CookieStore, CookieStoreRwLock};
-    /// #
-    /// # fn main(){
-    /// # let cookies = CookieStore::default();
-    /// # let mut saved = Vec::new();
-    /// # cookies.save_json(&mut saved).unwrap();
-    /// # let cookies = String::from_utf8(saved).unwrap();
-    /// # let data = format!(r#"{"cookies":"{}", "refresh_token":"123"}"#, cookies);
-    /// let reader = std::io::BufReader::new(data.as_bytes());
-    /// let c = Credential::load_json(reader).unwrap();
-    /// # }
-    /// ```
-    pub fn load_json<R: BufRead>(r: R) -> BResult<Self> {
-        let c = serde_json::from_reader(r).map_err(|e| BError::from_internal_err(&e))?;
-        Ok(c)
     }
 
     /// Check and refresh credential when needed
@@ -336,22 +332,36 @@ mod test {
     }
 
     #[test]
-    fn test_save_json() {
+    fn test_save_json_file() {
         let test_case = Credential {
             cookies: format!("TeSt_cASe_c0oKieS"),
             refresh_token: format!("tEst_rEfResH_t0kEn"),
         };
-        let f = std::fs::OpenOptions::new()
+        let mut f = std::fs::OpenOptions::new()
             .create(true)
             .truncate(true)
             .write(true)
             .open(temp_dir().join("test.json"))
             .unwrap();
-        let mut w = BufWriter::new(f);
-        test_case.save_json(&mut w).unwrap();
-        drop(w);
+        let _ = test_case.save_json(&mut f).unwrap();
+        drop(f);
         let result = std::fs::read_to_string(temp_dir().join("test.json")).unwrap();
         let rdr = BufReader::new(result.as_bytes());
+        let result = Credential::load_json(rdr).unwrap();
+        assert_eq!(result, test_case);
+    }
+
+    #[test]
+    fn test_save_json_buf() {
+        let test_case = Credential {
+            cookies: format!("TeSt_cASe_c0oKieS"),
+            refresh_token: format!("tEst_rEfResH_t0kEn"),
+        };
+        let mut v = Vec::new();
+        let mut writer = BufWriter::new(&mut v);
+        let _ = test_case.save_json(&mut writer).unwrap();
+        drop(writer);
+        let rdr = BufReader::new(&v[..]);
         let result = Credential::load_json(rdr).unwrap();
         assert_eq!(result, test_case);
     }
