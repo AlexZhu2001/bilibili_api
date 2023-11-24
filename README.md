@@ -29,7 +29,7 @@
 
 ## 温馨提示
 <strong>
-<h3>本项目遵守 [MIT](LICENSE) 协议，请勿滥用本项目，使用本项目造成的任何不良影响及后果自行承担</h3>
+<h3>本项目遵守 [MIT](https://github.com/AlexZhu2001/bilibili_api/edit/master/LICENSE) 协议，请勿滥用本项目，使用本项目造成的任何不良影响及后果自行承担</h3>
 </strong>
 
 ## 鸣谢
