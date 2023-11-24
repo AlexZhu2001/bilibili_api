@@ -5,6 +5,7 @@ on:
       - "*"
 env:
   RUST_BACKTRACE: 1
+  CRED_TEST: ${{ secrets.CODECOV_TOKEN }}
 jobs:
   coverage:
     strategy:
