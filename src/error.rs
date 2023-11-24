@@ -24,24 +24,48 @@ pub enum BError {
 }
 
 impl BError {
+    #[cfg(not(tarpaulin_include))]
     pub(crate) fn from_net_err<T: Display + ?Sized>(e: &T) -> Self {
         BError::NetworkError(format!("Network error, {}", e))
     }
 
+    #[cfg(not(tarpaulin_include))]
     pub(crate) fn from_json_err<T: Display + ?Sized>(e: &T) -> Self {
         BError::JsonParseError(format!("Json parse error, {}", e))
     }
 
+    #[cfg(not(tarpaulin_include))]
     pub(crate) fn from_internal_err<T: Display + ?Sized>(e: &T) -> Self {
         BError::InternalError(format!("Internal error, {}", e))
     }
 
+    #[cfg(not(tarpaulin_include))]
     pub(crate) fn from_bilibili_err(e: i64) -> Self {
         BError::BilibiliError(e)
     }
 
     pub(crate) fn from_qrcode_err<T: Display + ?Sized>(e: &T) -> Self {
         BError::QrCodeGenError(format!("QrCode generate error, {}", e))
+    }
+}
+
+impl Display for BError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BError::InternalError(s) => write!(f, "{}", s),
+            BError::NetworkError(s) => write!(f, "{}", s),
+            BError::JsonParseError(s) => write!(f, "{}", s),
+            BError::WbiTokenExpired => write!(f, "Wbi token expired, try re-run"),
+            BError::BilibiliError(c) => {
+                if !c.is_positive() {
+                    let error = try_parse_error_code(*c);
+                    write!(f, "{}", error)
+                } else {
+                    write!(f, "Bilibili server returned an error, code is {}", c)
+                }
+            }
+            BError::QrCodeGenError(s) => write!(f, "{}", s),
+        }
     }
 }
 
@@ -117,4 +141,34 @@ pub fn try_parse_error_code(error_code: i64) -> &'static str {
         _ => "未知错误",
     };
     return err;
+}
+
+#[cfg(test)]
+mod test {
+    use super::BError;
+    #[test]
+    fn test_error() {
+        const ERR_CODES: [i64; 50] = [
+            0, -1, -2, -3, -4, -101, -102, -103, -104, -105, -106, -107, -108, -110, -111, -112,
+            -113, -114, -115, -304, -307, -400, -401, -403, -404, -405, -409, -412, -500, -503,
+            -504, -509, -616, -617, -625, -626, -628, -629, -632, -643, -650, -652, -658, -662,
+            -688, -689, -701, -799, -8888, -10086,
+        ];
+        let msg = BError::from_net_err("Test Net Error");
+        println!("{}", msg);
+        let msg = BError::from_json_err("Test Json Error");
+        println!("{}", msg);
+        let msg = BError::from_internal_err("Test Internal error");
+        println!("{}", msg);
+        let msg = BError::from_qrcode_err("Test QRCode error");
+        println!("{}", msg);
+        let msg = BError::WbiTokenExpired;
+        println!("{}", msg);
+        for c in ERR_CODES {
+            let msg = BError::from_bilibili_err(c);
+            println!("{}", msg);
+        }
+        let msg = BError::from_bilibili_err(10086);
+        println!("{}", msg);
+    }
 }

@@ -60,4 +60,11 @@ mod test {
             .unwrap();
         let _info = MyInfo::get(&client).await.unwrap();
     }
+
+    #[tokio::test]
+    #[should_panic]
+    async fn test_get_my_info_panic() {
+        let client = WbiClient::builder().build().await.unwrap();
+        let _info = MyInfo::get(&client).await.unwrap();
+    }
 }

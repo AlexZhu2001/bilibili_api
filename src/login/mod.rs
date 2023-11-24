@@ -25,7 +25,7 @@ lazy_static! {
 }
 
 /// Structure for persistent storage of cookies and refresh_token
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Credential {
     pub(crate) cookies: String,
     pub(crate) refresh_token: String,
@@ -62,6 +62,9 @@ fn hex_digest(v: &Vec<u8>) -> String {
 /// # Steps
 /// 1. Encrypt `refresh_{timestamp}` with RSA-OAEP(SHA256)
 /// 2. Encode result with Base-16 lowercase
+///
+/// *Warning: Without test*
+#[cfg(not(tarpaulin_include))]
 fn gen_correspond_path(ts: u64) -> BResult<String> {
     let mut rng = rand::thread_rng();
     let pem = include_str!("correspond_path.pem");
@@ -76,6 +79,9 @@ fn gen_correspond_path(ts: u64) -> BResult<String> {
 }
 
 /// Get refresh CSRF from server with refresh token
+///
+/// *Warning: Without test*
+#[cfg(not(tarpaulin_include))]
 async fn get_refresh_csrf(client: &Client, token: &str) -> BResult<String> {
     let url = bapi!(LOGIN_APIS, "get_refresh_csrf_template");
     let mut url = String::from(url);
@@ -97,6 +103,9 @@ async fn get_refresh_csrf(client: &Client, token: &str) -> BResult<String> {
 }
 
 /// Check if cookie need refresh
+///
+/// *Warning: Without test*
+#[cfg(not(tarpaulin_include))]
 async fn check_cookie(client: &Client) -> BResult<RefreshCheck> {
     let req = client.get(bapi!(LOGIN_APIS, "check_refresh"));
     let resp = do_request(req).await?;
@@ -110,6 +119,9 @@ async fn check_cookie(client: &Client) -> BResult<RefreshCheck> {
 }
 
 /// Do refresh with csrf
+///
+/// *Warning: Without test*
+#[cfg(not(tarpaulin_include))]
 async fn refresh_cookie(
     client: &Client,
     csrf: &str,
@@ -137,6 +149,9 @@ async fn refresh_cookie(
 }
 
 /// Confirm refresh is complete, invalid old refresh token
+///
+/// *Warning: Without test*
+#[cfg(not(tarpaulin_include))]
 async fn confirm_refresh(client: &Client, refresh_csrf: &str, old_token: &str) -> BResult<()> {
     let req = client.post(bapi!(LOGIN_APIS, "confirm_refresh"));
     let req = req.form(&[("csrf", refresh_csrf), ("refresh_token", old_token)]);
@@ -154,6 +169,9 @@ async fn confirm_refresh(client: &Client, refresh_csrf: &str, old_token: &str) -
 }
 
 /// Get bilibili cookie from cookie jar with given name
+///
+/// *Warning: Without test*
+#[cfg(not(tarpaulin_include))]
 fn get_bilibili_cookie(cookie_jar: Arc<CookieStoreRwLock>, name: &str) -> BResult<String> {
     let lock = cookie_jar
         .read()
@@ -200,7 +218,7 @@ impl Credential {
     /// # let mut saved = Vec::new();
     /// # cookies.save_json(&mut saved).unwrap();
     /// # let cookies = String::from_utf8(saved).unwrap();
-    /// # let data = format!(r#"{{"cookies":"{}", "refresh_token":"123"}}"#, cookies);
+    /// # let data = format!(r#"{"cookies":"{}", "refresh_token":"123"}"#, cookies);
     /// let reader = std::io::BufReader::new(data.as_bytes());
     /// let c = Credential::load_json(reader).unwrap();
     /// # }
@@ -219,6 +237,9 @@ impl Credential {
     /// 5. Get new refresh token from server
     /// 6. Refresh cookie with refresh_token, refresh_csrf and cookie
     /// 7. Confirm refresh with new cookie and old refresh token
+    ///
+    /// *Warning: Without fully test*
+    #[cfg(not(tarpaulin_include))]
     pub(crate) async fn check_and_refresh(
         &mut self,
         client: &Client,
@@ -266,8 +287,11 @@ impl Credential {
 #[cfg(test)]
 mod test {
     use base64::Engine;
+    use std::env::temp_dir;
     use std::io::BufReader;
+    use std::io::BufWriter;
 
+    use super::hex_digest;
     use super::Credential;
     use crate::wbi_client::WbiClient;
 
@@ -286,6 +310,50 @@ mod test {
             .build()
             .await
             .unwrap();
+    }
+
+    #[test]
+    fn test_hex_digest() {
+        let mut v = Vec::new();
+        let mut result = String::new();
+        for i in 0..0xFF {
+            v.push(i);
+            let sl = format!("{:02x}", i);
+            result.push_str(&sl);
+        }
+        let ans = hex_digest(&v);
+        assert_eq!(ans, result);
+    }
+
+    #[test]
+    fn test_load_json() {
+        const TEST_CASE: &str =
+            r#"{"cookies":"TeSt_cASe_c0oKieS", "refresh_token":"tEst_rEfResH_t0kEn"}"#;
+        let rdr = BufReader::new(TEST_CASE.as_bytes());
+        let cred = Credential::load_json(rdr).unwrap();
+        assert_eq!(cred.cookies, "TeSt_cASe_c0oKieS");
+        assert_eq!(cred.refresh_token, "tEst_rEfResH_t0kEn");
+    }
+
+    #[test]
+    fn test_save_json() {
+        let test_case = Credential {
+            cookies: format!("TeSt_cASe_c0oKieS"),
+            refresh_token: format!("tEst_rEfResH_t0kEn"),
+        };
+        let f = std::fs::OpenOptions::new()
+            .create(true)
+            .truncate(true)
+            .write(true)
+            .open(temp_dir().join("test.json"))
+            .unwrap();
+        let mut w = BufWriter::new(f);
+        test_case.save_json(&mut w).unwrap();
+        drop(w);
+        let result = std::fs::read_to_string(temp_dir().join("test.json")).unwrap();
+        let rdr = BufReader::new(result.as_bytes());
+        let result = Credential::load_json(rdr).unwrap();
+        assert_eq!(result, test_case);
     }
 }
 

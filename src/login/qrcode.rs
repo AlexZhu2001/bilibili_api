@@ -44,6 +44,7 @@ impl QRCodeLogin {
     }
 
     #[must_use]
+    #[cfg(not(tarpaulin_include))]
     pub async fn poll_login_state(&self, wbi_client: &WbiClient) -> BResult<QRCodeLoginState> {
         let data = [("qrcode_key", &self.qrcode_key)];
         let req = wbi_client.get_with_data(bapi!(LOGIN_APIS, "poll_qrcode"), &data);
@@ -65,5 +66,18 @@ impl QRCodeLogin {
             _ => return Err(BError::from_json_err("Invalid login state code found.")),
         };
         Ok(state)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::wbi_client::WbiClient;
+
+    use super::QRCodeLogin;
+    #[tokio::test]
+    async fn test_get_info() {
+        let client = WbiClient::builder().build().await.unwrap();
+        let _info = QRCodeLogin::get_login_info(&client).await.unwrap();
+        let _qrcode = _info.get_login_qrcode().unwrap();
     }
 }
