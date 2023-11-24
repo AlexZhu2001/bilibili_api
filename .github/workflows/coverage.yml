@@ -1,0 +1,33 @@
+name: coverage
+on:
+  push:
+    branches:
+      - "*"
+env:
+  RUST_BACKTRACE: 1
+jobs:
+  coverage:
+    strategy:
+      matrix:
+        version:
+          - stable
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
+    runs-on: ${{ matrix.os }}
+    environment: CRED_TEST
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.version }}
+      - name: install deps
+        run: cargo install tarpaulin
+      - name: coverage
+        run: cargo tarpaulin --engine llvm --follow-exec --out xml
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v3
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+  
